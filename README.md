@@ -1,68 +1,50 @@
-# Di2 Media Control
+# Di2 Media Controls
 
-Android app that translates Shimano Di2 D-Fly button presses into media controls (next/prev/play/pause) for any media app.
+Android app that connects to a Shimano Di2 EW-WU111 (or 12-speed built-in BLE) via Bluetooth Low Energy and translates D-Fly button presses into media controls for any media app.
 
 ## Architecture
 
 ```
-Di2 EW-WU111 ──BLE──▶ Di2BleService ──▶ MediaSessionManager ──▶ Spotify/YT Music/etc.
+Di2 EW-WU111 ──BLE──▶ Di2BleService ──▶ AudioManager ──▶ Spotify/YT Music/etc.
                         │
                         ├── Scans & connects to Di2 wireless unit
-                        ├── Subscribes to GATT notifications
-                        ├── Decodes D-Fly button events
-                        └── Dispatches to active MediaController
+                        ├── Subscribes to GATT indications
+                        ├── Decodes D-Fly button events (CH1–CH4)
+                        └── Dispatches media key events
 ```
+
+Media controls use `AudioManager.dispatchMediaKeyEvent()` — no special permissions beyond Bluetooth/Location needed.
 
 ## Setup
 
 ### Prerequisites
 - Shimano Di2 with EW-WU111 wireless unit (or 12-speed with built-in BLE)
-- E-Tube Project: assign buttons to **D-Fly Ch.1** and **D-Fly Ch.2**
+- E-Tube Project app: assign buttons to D-Fly channels (CH1–CH4)
 - Android 8.0+
+- Device must be bonded (paired) before indications work
 
 ### Permissions needed
-1. **Bluetooth/Location** — for BLE scanning
-2. **Notification Access** — required for `MediaSessionManager.getActiveSessions()`
-   - App will prompt you to enable this in Android Settings
+- **Bluetooth/Location** — for BLE scanning and connection
 
-### Default button mapping
-| Button          | Action         |
-|-----------------|----------------|
-| CH1 short press | Next track     |
-| CH1 long press  | Play/Pause     |
-| CH2 short press | Previous track |
-| CH2 long press  | (unmapped)     |
+### Button mapping
 
-## ⚠️ TODO: BLE Protocol
-
-The UUIDs in `Di2BleService.kt` are **placeholders**. You need to discover the real ones:
-
-### How to find your Di2's BLE UUIDs
-
-1. **nRF Connect app** (free, Nordic Semiconductor) — scan, connect to your
-   EW-WU111, browse services/characteristics. Note all UUIDs.
-
-2. Put your Di2 in connection mode (press junction box button until LEDs flash).
-
-3. Connect with nRF Connect, enable notifications on characteristics that
-   have the NOTIFY property, then press Di2 buttons and observe the raw bytes.
-
-4. Update these constants in `Di2BleService.kt`:
-   - `DI2_SERVICE_UUID`
-   - `DI2_BUTTON_CHAR_UUID`
-
-5. Update `handleButtonPress()` byte decoding based on observed patterns.
-
-### Known community resources
-- https://bettershifting.com — Di2 protocol info
-- Search GitHub for "shimano di2 ble" for protocol reverse-engineering
-- The Cadence app (getcadence.app) successfully reads Di2 buttons — their
-  approach confirms this is doable
+Each channel supports short press, long press, and double press. Mappings are configurable per-channel in the app. Available actions include next/previous track, play/pause, and volume up/down (with hold-to-ramp for long press).
 
 ## Build
 
-Standard Android Studio project. Requires:
-- Kotlin 1.9+
-- Jetpack Compose (Material 3)
-- Min SDK 26 (Android 8.0)
-- Target SDK 34
+```sh
+nix develop                                    # Enter dev shell with Gradle, Kotlin, Android SDK
+./gradlew assembleDebug                        # Debug build
+./gradlew assembleRelease                      # Release build (R8 minified, debug-key signed)
+./gradlew installDebug                         # Install debug on connected device
+adb install app/build/outputs/apk/release/app-release.apk  # Install release
+```
+
+## Di2 BLE Protocol
+
+- Service UUID: `000018ef-5348-494d-414e-4f5f424c4500`
+- Button characteristic: `00002ac2` — uses **indicate** (not notify)
+- Byte format: `[counter, ch1, ch2, ch3, ch4]`
+  - `0xF0` = unmapped channel
+  - `0x10` bit = short press, `0x20` = long press, `0x40` = double press
+  - All bits cleared = released
