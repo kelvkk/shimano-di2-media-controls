@@ -138,7 +138,6 @@ class MainActivity : ComponentActivity() {
 
     private fun startAndBindService() {
         val intent = Intent(this, Di2BleService::class.java)
-        startForegroundService(intent)
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 }

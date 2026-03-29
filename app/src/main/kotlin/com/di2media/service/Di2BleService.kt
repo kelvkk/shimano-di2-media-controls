@@ -73,7 +73,6 @@ class Di2BleService : Service() {
         dispatcher = ActionDispatcher(this)
         mappingConfig = ButtonMappingConfig(this)
         createNotificationChannel()
-        startForeground(NOTIFICATION_ID, buildNotification("Di2 Media: Ready"))
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -104,6 +103,7 @@ class Di2BleService : Service() {
         scanning = true
         _discoveredDevices.value = emptyList()
         _connectionState.value = ConnectionState.SCANNING
+        startForeground(NOTIFICATION_ID, buildNotification("Di2 Media: Scanning"))
 
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
@@ -180,7 +180,7 @@ class Di2BleService : Service() {
         _channelStates.value = emptyMap()
         initialized = false
         lastChannelValues = null
-        updateNotification("Di2 Media: Disconnected")
+        stopForeground(STOP_FOREGROUND_REMOVE)
     }
 
     fun shutdown() {
