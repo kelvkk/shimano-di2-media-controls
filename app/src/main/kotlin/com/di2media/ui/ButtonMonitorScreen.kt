@@ -11,13 +11,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.di2media.mapping.ButtonAction
+import com.di2media.mapping.ButtonBinding
 import com.di2media.service.PressType
+
+data class ChannelMappings(
+    val short: ButtonAction,
+    val long: ButtonAction,
+    val double: ButtonAction,
+)
 
 @Composable
 fun ButtonMonitorScreen(
     channelStates: Map<Int, PressType?>,
+    channelMappings: Map<Int, ChannelMappings>,
     onDisconnectClick: () -> Unit,
 ) {
     Column(
@@ -47,6 +57,7 @@ fun ButtonMonitorScreen(
                         ChannelIndicator(
                             channel = ch,
                             pressType = channelStates[ch],
+                            mappings = channelMappings[ch],
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -66,6 +77,7 @@ fun ButtonMonitorScreen(
 private fun ChannelIndicator(
     channel: Int,
     pressType: PressType?,
+    mappings: ChannelMappings?,
     modifier: Modifier = Modifier,
 ) {
     val backgroundColor by animateColorAsState(
@@ -86,30 +98,50 @@ private fun ChannelIndicator(
         null -> "Idle"
     }
 
-    Card(
-        modifier = modifier.aspectRatio(0.8f),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Card(
+            modifier = Modifier.fillMaxWidth().aspectRatio(0.85f),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = backgroundColor)
         ) {
-            Text(
-                "CH $channel",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                stateLabel,
-                fontSize = 16.sp,
-                color = Color.White.copy(alpha = 0.9f)
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    "CH $channel",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stateLabel,
+                    fontSize = 14.sp,
+                    color = Color.White.copy(alpha = 0.9f)
+                )
+            }
+        }
+
+        if (mappings != null) {
+            Spacer(Modifier.height(4.dp))
+            MappingLabel("S", mappings.short.label)
+            MappingLabel("L", mappings.long.label)
+            MappingLabel("D", mappings.double.label)
         }
     }
+}
+
+@Composable
+private fun MappingLabel(prefix: String, label: String) {
+    if (label == "None") return
+    Text(
+        "$prefix: $label",
+        fontSize = 11.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
+    )
 }

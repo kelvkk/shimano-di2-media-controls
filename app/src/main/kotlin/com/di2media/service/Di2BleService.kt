@@ -11,6 +11,8 @@ import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
 import android.util.Log
+import com.di2media.mapping.ActionDispatcher
+import com.di2media.mapping.ButtonMappingConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -55,11 +57,18 @@ class Di2BleService : Service() {
 
     private var lastChannelValues: IntArray? = null
     private var initialized = false
+    private var lastPressTypes = mutableMapOf<Int, PressType?>()
+
+    private lateinit var dispatcher: ActionDispatcher
+    lateinit var mappingConfig: ButtonMappingConfig
+        private set
 
     // ── Lifecycle ───────────────────────────────────────────────
 
     override fun onCreate() {
         super.onCreate()
+        dispatcher = ActionDispatcher(this)
+        mappingConfig = ButtonMappingConfig(this)
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification("Di2 Media: Ready"))
     }
@@ -69,6 +78,7 @@ class Di2BleService : Service() {
     override fun onDestroy() {
         stopScan()
         bluetoothGatt?.close()
+        if (::dispatcher.isInitialized) dispatcher.destroy()
         super.onDestroy()
     }
 
@@ -269,6 +279,20 @@ class Di2BleService : Service() {
                 }
                 newStates[channel] = pressType
                 Log.i(TAG, "CH$channel: ${pressType?.name ?: "RELEASED"}")
+
+                val prevPressType = lastPressTypes[channel]
+                when {
+                    pressType == PressType.SHORT || pressType == PressType.DOUBLE -> {
+                        dispatcher.dispatch(mappingConfig.getInstantAction(channel, pressType))
+                    }
+                    pressType == PressType.LONG -> {
+                        dispatcher.onHoldStart(channel, mappingConfig.getHoldAction(channel))
+                    }
+                    pressType == null && prevPressType == PressType.LONG -> {
+                        dispatcher.onHoldStop(channel)
+                    }
+                }
+                lastPressTypes[channel] = pressType
             }
 
             // Ensure channel is tracked

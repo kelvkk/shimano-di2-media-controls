@@ -20,7 +20,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
 import com.di2media.service.ConnectionState
 import com.di2media.service.Di2BleService
+import com.di2media.mapping.ButtonBinding
+import com.di2media.service.PressType
 import com.di2media.ui.ButtonMonitorScreen
+import com.di2media.ui.ChannelMappings
 import com.di2media.ui.DeviceSetupScreen
 
 class MainActivity : ComponentActivity() {
@@ -59,9 +62,19 @@ class MainActivity : ComponentActivity() {
                 val channelStates by service.channelStates.collectAsState()
                 val devices by service.discoveredDevices.collectAsState()
 
+                val channelMappings = (1..4).associateWith { ch ->
+                    val config = service.mappingConfig
+                    ChannelMappings(
+                        short = config.getAction(ch, PressType.SHORT),
+                        long = config.getAction(ch, PressType.LONG),
+                        double = config.getAction(ch, PressType.DOUBLE),
+                    )
+                }
+
                 when (connectionState) {
                     ConnectionState.CONNECTED -> ButtonMonitorScreen(
                         channelStates = channelStates,
+                        channelMappings = channelMappings,
                         onDisconnectClick = {
                             service.shutdown()
                             finish()
