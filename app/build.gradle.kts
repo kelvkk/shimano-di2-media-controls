@@ -16,9 +16,18 @@ android {
         versionName = "0.1.0"
     }
 
+    signingConfigs {
+        named("debug") {
+            // Use default debug keystore at ~/.android/debug.keystore
+        }
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
