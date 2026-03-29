@@ -8,6 +8,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.di2media.R
 import androidx.compose.ui.unit.dp
 import com.di2media.service.ConnectionState
 import com.di2media.service.DiscoveredDevice
@@ -27,7 +29,7 @@ fun DeviceSetupScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text("Di2 Media Control", style = MaterialTheme.typography.headlineMedium)
+        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
 
         StatusIndicator(connectionState)
 

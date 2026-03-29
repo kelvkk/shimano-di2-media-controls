@@ -104,7 +104,7 @@ class Di2BleService : Service() {
         scanning = true
         _discoveredDevices.value = emptyList()
         _connectionState.value = ConnectionState.SCANNING
-        startForeground(NOTIFICATION_ID, buildNotification("Di2 Media: Scanning"))
+        startForeground(NOTIFICATION_ID, buildNotification("Scanning"))
 
         val settings = ScanSettings.Builder()
             .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
@@ -200,13 +200,13 @@ class Di2BleService : Service() {
                     Log.i(TAG, "Connected to Di2")
                     _connectionState.value = ConnectionState.CONNECTED
                     gatt.discoverServices()
-                    updateNotification("Di2 Media: Connected")
+                    updateNotification("Connected")
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     Log.i(TAG, "Disconnected from Di2")
                     _connectionState.value = ConnectionState.DISCONNECTED
                     _channelStates.value = emptyMap()
-                    updateNotification("Di2 Media: Disconnected")
+                    updateNotification("Disconnected")
                     gatt.close()
                 }
             }
@@ -320,7 +320,7 @@ class Di2BleService : Service() {
 
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
-            CHANNEL_ID, "Di2 Media Control",
+            CHANNEL_ID, getString(R.string.app_name),
             NotificationManager.IMPORTANCE_LOW
         )
         (getSystemService(NotificationManager::class.java)).createNotificationChannel(channel)
@@ -342,7 +342,7 @@ class Di2BleService : Service() {
         )
 
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("Di2 Media")
+            .setContentTitle(getString(R.string.app_name))
             .setContentText(text)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(contentPendingIntent)
