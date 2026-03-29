@@ -3,6 +3,7 @@ package com.di2media.service
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.bluetooth.*
 import android.bluetooth.le.*
@@ -11,6 +12,7 @@ import android.content.Intent
 import android.os.Binder
 import android.os.IBinder
 import android.util.Log
+import com.di2media.MainActivity
 import com.di2media.mapping.ActionDispatcher
 import com.di2media.mapping.ButtonMappingConfig
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +26,7 @@ class Di2BleService : Service() {
         const val TAG = "Di2BleService"
         const val CHANNEL_ID = "di2_media_channel"
         const val NOTIFICATION_ID = 1
+        const val ACTION_DISCONNECT = "com.di2media.ACTION_DISCONNECT"
 
         val DI2_SERVICE_UUID: UUID = UUID.fromString("000018ef-5348-494d-414e-4f5f424c4500")
         val DI2_BUTTON_CHAR_UUID: UUID = UUID.fromString("00002ac2-5348-494d-414e-4f5f424c4500")
@@ -71,6 +74,14 @@ class Di2BleService : Service() {
         mappingConfig = ButtonMappingConfig(this)
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification("Di2 Media: Ready"))
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == ACTION_DISCONNECT) {
+            shutdown()
+            return START_NOT_STICKY
+        }
+        return START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder = binder
@@ -169,6 +180,7 @@ class Di2BleService : Service() {
         _channelStates.value = emptyMap()
         initialized = false
         lastChannelValues = null
+        updateNotification("Di2 Media: Disconnected")
     }
 
     fun shutdown() {
@@ -314,10 +326,26 @@ class Di2BleService : Service() {
     }
 
     private fun buildNotification(text: String): Notification {
+        val launchIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val contentPendingIntent = PendingIntent.getActivity(
+            this, 0, launchIntent, PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val disconnectIntent = Intent(this, Di2BleService::class.java).apply {
+            action = ACTION_DISCONNECT
+        }
+        val disconnectPendingIntent = PendingIntent.getService(
+            this, 1, disconnectIntent, PendingIntent.FLAG_IMMUTABLE
+        )
+
         return Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("Di2 Media")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_media_play)
+            .setContentIntent(contentPendingIntent)
+            .addAction(Notification.Action.Builder(null, "Disconnect", disconnectPendingIntent).build())
             .build()
     }
 

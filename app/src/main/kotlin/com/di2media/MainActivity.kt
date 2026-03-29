@@ -94,20 +94,14 @@ class MainActivity : ComponentActivity() {
                         channelStates = channelStates,
                         channelMappings = channelMappings,
                         onChannelClick = { selectedChannel.value = it },
-                        onDisconnectClick = {
-                            service.shutdown()
-                            finish()
-                        }
+                        onDisconnectClick = { service.disconnect() }
                     )
                     else -> DeviceSetupScreen(
                         connectionState = connectionState,
                         devices = devices,
                         onScanClick = { service.startScan() },
                         onDeviceClick = { address -> service.connectToDevice(address) },
-                        onDisconnectClick = {
-                            service.shutdown()
-                            finish()
-                        }
+                        onDisconnectClick = { service.disconnect() }
                     )
                 }
             }
