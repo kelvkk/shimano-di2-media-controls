@@ -38,6 +38,7 @@
               jdk17
               android-tools
               androidSdk
+              imagemagick
             ];
 
             JAVA_HOME = "${pkgs.jdk17}";

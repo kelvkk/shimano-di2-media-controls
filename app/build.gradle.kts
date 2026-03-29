@@ -4,6 +4,26 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val generateIcons by tasks.registering(Exec::class) {
+    val src = rootProject.file("app-logo.png")
+    val resDir = layout.projectDirectory.dir("src/main/res")
+    inputs.file(src)
+    outputs.dir(resDir.dir("mipmap-xxxhdpi"))
+
+    val densities = mapOf("mdpi" to (48 to 108), "hdpi" to (72 to 162), "xhdpi" to (96 to 216), "xxhdpi" to (144 to 324), "xxxhdpi" to (192 to 432))
+    val cmds = densities.flatMap { (density, sizes) ->
+        val dir = resDir.dir("mipmap-$density").asFile
+        listOf(
+            "mkdir -p $dir",
+            "magick $src -resize ${sizes.first}x${sizes.first} $dir/ic_launcher.png",
+            "magick $src -resize ${sizes.second * 66 / 108}x${sizes.second * 66 / 108} -gravity center -background white -extent ${sizes.second}x${sizes.second} $dir/ic_launcher_foreground.png",
+        )
+    }
+    commandLine("bash", "-c", cmds.joinToString(" && "))
+}
+
+tasks.named("preBuild") { dependsOn(generateIcons) }
+
 android {
     namespace = "com.di2media"
     compileSdk = 35

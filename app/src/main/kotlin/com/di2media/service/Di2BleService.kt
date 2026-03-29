@@ -13,6 +13,7 @@ import android.os.Binder
 import android.os.IBinder
 import android.util.Log
 import com.di2media.MainActivity
+import com.di2media.R
 import com.di2media.mapping.ActionDispatcher
 import com.di2media.mapping.ButtonMappingConfig
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -343,7 +344,7 @@ class Di2BleService : Service() {
         return Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("Di2 Media")
             .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(contentPendingIntent)
             .addAction(Notification.Action.Builder(null, "Disconnect", disconnectPendingIntent).build())
             .build()
