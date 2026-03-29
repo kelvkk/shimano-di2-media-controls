@@ -2,6 +2,7 @@ package com.di2media.ui
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -28,6 +29,7 @@ data class ChannelMappings(
 fun ButtonMonitorScreen(
     channelStates: Map<Int, PressType?>,
     channelMappings: Map<Int, ChannelMappings>,
+    onChannelClick: (Int) -> Unit,
     onDisconnectClick: () -> Unit,
 ) {
     Column(
@@ -58,6 +60,7 @@ fun ButtonMonitorScreen(
                             channel = ch,
                             pressType = channelStates[ch],
                             mappings = channelMappings[ch],
+                            onClick = { onChannelClick(ch) },
                             modifier = Modifier.weight(1f)
                         )
                     }
@@ -78,6 +81,7 @@ private fun ChannelIndicator(
     channel: Int,
     pressType: PressType?,
     mappings: ChannelMappings?,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val backgroundColor by animateColorAsState(
@@ -98,7 +102,7 @@ private fun ChannelIndicator(
         null -> "Idle"
     }
 
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier = modifier.clickable(onClick = onClick), horizontalAlignment = Alignment.CenterHorizontally) {
         Card(
             modifier = Modifier.fillMaxWidth().aspectRatio(0.85f),
             shape = RoundedCornerShape(16.dp),

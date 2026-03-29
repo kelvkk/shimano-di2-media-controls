@@ -23,12 +23,15 @@ import com.di2media.service.Di2BleService
 import com.di2media.mapping.ButtonBinding
 import com.di2media.service.PressType
 import com.di2media.ui.ButtonMonitorScreen
+import com.di2media.ui.ChannelConfigScreen
 import com.di2media.ui.ChannelMappings
 import com.di2media.ui.DeviceSetupScreen
 
 class MainActivity : ComponentActivity() {
 
     private val bleService = mutableStateOf<Di2BleService?>(null)
+    private val selectedChannel = mutableStateOf<Int?>(null)
+    private val mappingVersion = mutableStateOf(0)
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -62,6 +65,9 @@ class MainActivity : ComponentActivity() {
                 val channelStates by service.channelStates.collectAsState()
                 val devices by service.discoveredDevices.collectAsState()
 
+                // Read mappingVersion to trigger recomposition on config changes
+                @Suppress("UNUSED_VARIABLE")
+                val version = mappingVersion.value
                 val channelMappings = (1..4).associateWith { ch ->
                     val config = service.mappingConfig
                     ChannelMappings(
@@ -71,10 +77,23 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                when (connectionState) {
-                    ConnectionState.CONNECTED -> ButtonMonitorScreen(
+                val configChannel = selectedChannel.value
+                when {
+                    configChannel != null -> ChannelConfigScreen(
+                        channel = configChannel,
+                        currentMappings = channelMappings[configChannel] ?: return@MaterialTheme,
+                        onMappingChanged = { pressType, action ->
+                            service.mappingConfig.setMapping(
+                                ButtonBinding(configChannel, pressType), action
+                            )
+                            mappingVersion.value++
+                        },
+                        onBack = { selectedChannel.value = null }
+                    )
+                    connectionState == ConnectionState.CONNECTED -> ButtonMonitorScreen(
                         channelStates = channelStates,
                         channelMappings = channelMappings,
+                        onChannelClick = { selectedChannel.value = it },
                         onDisconnectClick = {
                             service.shutdown()
                             finish()
