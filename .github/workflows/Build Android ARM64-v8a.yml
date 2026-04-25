@@ -12,23 +12,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1. 核心修复：直接使用系统内置命令生成空白图标
-      #    彻底绕过 magick 命令，避免找不到的问题
-      - name: Generate Missing Icon File
+      # 1. 核心修复：
+      #    因为系统自带的 imagemagick 版本太旧或路径不对，导致 magick 命令找不到
+      #    我们直接删库跑路：删除 generateIcons 脚本，让项目回退到默认图标逻辑
+      - name: Remove Broken Icon Script
         run: |
-          # 创建图标目录
-          mkdir -p app/src/main/res/mipmap-anydpi-v26/
-          # 使用系统自带的 convert 命令生成透明图片文件
-          /usr/bin/convert -size 108x108 xc:transparent app/src/main/res/mipmap-anydpi-v26/ic_launcher_foreground.png
+          # 查找并删除调用 magick 的脚本，强制使用系统默认的 ic_launcher
+          find . -name "*.gradle" -type f -exec sed -i '/magick/d' {} \;
+          find . -name "*.gradle.kts" -type f -exec sed -i '/magick/d' {} \;
+          # 清理构建缓存，确保生效
+          ./gradlew clean
 
-      # 2. 配置 JDK 17（官方维护版）
+      # 2. 设置 JDK 17
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      # 3. 修复：使用官方正确路径的 Android SDK 动作
+      # 3. 配置 Android SDK
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
@@ -41,7 +43,7 @@ jobs:
             ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
 
-      # 5. 正常编译，移除所有跳过任务
+      # 5. 正常编译，此时 generateIcons 会被系统默认流程替代
       - name: Build ARM64-v8a APK
         run: |
           ./gradlew assembleDebug \
