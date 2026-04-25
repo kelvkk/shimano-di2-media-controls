@@ -1,4 +1,4 @@
-name: Build Android ARM64-v8a (FINAL FIX)
+name: Build Android ARM64-v8a (FINAL BATTLE)
 
 on:
   push:
@@ -11,14 +11,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      # 1. 核心修复：直接删掉错误的图标引用，强制使用默认图标
-      - name: Fix Missing Icon Reference
-        run: |
-          # 直接修改 XML 文件，把引用 ic_launcher_foreground 的那一行删掉
-          sed -i '/ic_launcher_foreground/d' app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
-          # 清理旧构建缓存
-          ./gradlew clean
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -37,13 +29,13 @@ jobs:
             ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
 
-      # 2. 正常编译
+      # 核心修改：使用 --exclude-task 强制跳过 generateIcons，彻底绕过 magick 报错
       - name: Build ARM64-v8a APK
         run: |
           ./gradlew assembleDebug \
-            -Pandroid.buildArchitectures=arm64-v8a
+            -Pandroid.buildArchitectures=arm64-v8a \
+            --exclude-task generateIcons
 
-      # 3. 上传
       - name: Upload ARM64-v8a APK
         uses: actions/upload-artifact@v4
         with:
