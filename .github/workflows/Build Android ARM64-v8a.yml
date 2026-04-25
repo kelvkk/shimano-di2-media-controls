@@ -12,24 +12,27 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1. 核心修复：
-      #    不安装 ImageMagick，直接用系统自带的 convert（属于 imagemagick-6-common）
-      #    强制生成一个空白的前景图标，修补 R 错误
-      - name: Generate Missing Icon
+      # 1. 核心修复：直接使用系统内置命令生成空白图标
+      #    彻底绕过 magick 命令，避免找不到的问题
+      - name: Generate Missing Icon File
         run: |
+          # 创建图标目录
           mkdir -p app/src/main/res/mipmap-anydpi-v26/
-          # 直接使用系统内置的 convert 命令生成透明图标，无需安装 magick
-          convert -size 108x108 xc:transparent app/src/main/res/mipmap-anydpi-v26/ic_launcher_foreground.png
+          # 使用系统自带的 convert 命令生成透明图片文件
+          /usr/bin/convert -size 108x108 xc:transparent app/src/main/res/mipmap-anydpi-v26/ic_launcher_foreground.png
 
+      # 2. 配置 JDK 17（官方维护版）
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
+      # 3. 修复：使用官方正确路径的 Android SDK 动作
       - name: Setup Android SDK
-        uses: actions-actions/setup-android@v3 # 修正：使用官方维护的完整路径
+        uses: android-actions/setup-android@v3
 
+      # 4. 缓存依赖
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
@@ -38,13 +41,13 @@ jobs:
             ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
 
-      # 2. 正常编译，不再跳过任何任务
+      # 5. 正常编译，移除所有跳过任务
       - name: Build ARM64-v8a APK
         run: |
           ./gradlew assembleDebug \
             -Pandroid.buildArchitectures=arm64-v8a
 
-      # 3. 上传产物
+      # 6. 上传产物
       - name: Upload ARM64-v8a APK
         uses: actions/upload-artifact@v4
         with:
