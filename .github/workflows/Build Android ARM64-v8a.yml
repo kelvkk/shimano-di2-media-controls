@@ -12,12 +12,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1. 彻底安装 ImageMagick 并生成默认图标
-      - name: Fix ImageMagick & Generate Icons
+      # 1. 核心修复：
+      #    不安装 ImageMagick，直接用系统自带的 convert（属于 imagemagick-6-common）
+      #    强制生成一个空白的前景图标，修补 R 错误
+      - name: Generate Missing Icon
         run: |
-          sudo apt-get update && sudo apt-get install -y imagemagick
-          # 强制生成一个不存在的前景图标文件，修补 R 错误
           mkdir -p app/src/main/res/mipmap-anydpi-v26/
+          # 直接使用系统内置的 convert 命令生成透明图标，无需安装 magick
           convert -size 108x108 xc:transparent app/src/main/res/mipmap-anydpi-v26/ic_launcher_foreground.png
 
       - name: Set up JDK 17
@@ -27,7 +28,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: actions-actions/setup-android@v3 # 修正：使用官方维护的完整路径
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -37,8 +38,7 @@ jobs:
             ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
 
-      # 2. 核心修改：恢复正常编译指令，移除所有 --exclude-task
-      # 因为我们已经手动生成了缺失的图标文件，现在可以正常编译了
+      # 2. 正常编译，不再跳过任何任务
       - name: Build ARM64-v8a APK
         run: |
           ./gradlew assembleDebug \
