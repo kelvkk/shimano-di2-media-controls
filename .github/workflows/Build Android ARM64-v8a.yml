@@ -1,4 +1,4 @@
-name: Build Android ARM64-v8a (Fixed)
+name: Build Android ARM64-v8a (Final Fix)
 
 on:
   push:
@@ -12,7 +12,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1. 彻底安装 ImageMagick
+      # 1. 安装 ImageMagick 以解决图标生成问题
       - name: Install ImageMagick
         run: sudo apt-get update && sudo apt-get install -y imagemagick
 
@@ -33,18 +33,16 @@ jobs:
             ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
 
-      # 2. 核心修改：
-      #    a. 使用 env 注入 PATH，确保能找到 magick
-      #    b. 使用 --exclude-task 彻底跳过图标生成
+      # 2. 核心构建命令：只保留 Debug 和 ARM64-v8a，删掉多余参数
       - name: Build ARM64-v8a APK
         env:
-          PATH: /usr/bin:$PATH  # 强制把系统安装路径加入首位
+          PATH: /usr/bin:$PATH  # 强制系统优先找到 magick
         run: |
           ./gradlew assembleDebug \
             -Pandroid.buildArchitectures=arm64-v8a \
-            --exclude-task generateIcons \
-            --exclude-task generateReleasePlayResources
+            --exclude-task generateIcons
 
+      # 3. 上传产物
       - name: Upload ARM64-v8a APK
         uses: actions/upload-artifact@v4
         with:
