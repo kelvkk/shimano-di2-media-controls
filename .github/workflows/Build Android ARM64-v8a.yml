@@ -12,9 +12,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1. 安装 ImageMagick（为了兼容原有构建逻辑）
-      - name: Install ImageMagick
-        run: sudo apt-get update && sudo apt-get install -y imagemagick
+      # 1. 彻底安装 ImageMagick 并生成默认图标
+      - name: Fix ImageMagick & Generate Icons
+        run: |
+          sudo apt-get update && sudo apt-get install -y imagemagick
+          # 强制生成一个不存在的前景图标文件，修补 R 错误
+          mkdir -p app/src/main/res/mipmap-anydpi-v26/
+          convert -size 108x108 xc:transparent app/src/main/res/mipmap-anydpi-v26/ic_launcher_foreground.png
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -33,21 +37,16 @@ jobs:
             ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
 
-      # 2. 核心修改：直接编译 Debug 模式的 JAR，跳过所有资源链路
-      - name: Build ARM64-v8a Core Jar
-        env:
-          PATH: /usr/bin:$PATH
+      # 2. 核心修改：恢复正常编译指令，移除所有 --exclude-task
+      # 因为我们已经手动生成了缺失的图标文件，现在可以正常编译了
+      - name: Build ARM64-v8a APK
         run: |
           ./gradlew assembleDebug \
-            -Pandroid.buildArchitectures=arm64-v8a \
-            --exclude-task generateIcons \
-            --exclude-task mergeDebugResources \
-            --exclude-task processDebugResources \
-            --exclude-task packageDebugResources
+            -Pandroid.buildArchitectures=arm64-v8a
 
-      # 3. 上传产物（注意路径改为 JAR）
-      - name: Upload Core Jar
+      # 3. 上传产物
+      - name: Upload ARM64-v8a APK
         uses: actions/upload-artifact@v4
         with:
-          name: 编译成品-ARM64-v8a-Jar
+          name: 编译成品-ARM64-v8a
           path: app/build/outputs/apk/debug/app-debug.apk
