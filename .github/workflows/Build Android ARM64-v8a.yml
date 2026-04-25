@@ -12,7 +12,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1. 安装依赖
+      # 1. 安装 ImageMagick（为了兼容原有构建逻辑）
       - name: Install ImageMagick
         run: sudo apt-get update && sudo apt-get install -y imagemagick
 
@@ -33,21 +33,21 @@ jobs:
             ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
 
-      # 2. 核心修改：
-      #    - 使用 -R 参数替换资源，强制使用系统默认图标
-      #    - 彻底跳过 generateIcons 任务
-      - name: Build ARM64-v8a APK
+      # 2. 核心修改：直接编译 Debug 模式的 JAR，跳过所有资源链路
+      - name: Build ARM64-v8a Core Jar
         env:
           PATH: /usr/bin:$PATH
         run: |
           ./gradlew assembleDebug \
             -Pandroid.buildArchitectures=arm64-v8a \
             --exclude-task generateIcons \
-            -R
-      
-      # 3. 上传产物
-      - name: Upload ARM64-v8a APK
+            --exclude-task mergeDebugResources \
+            --exclude-task processDebugResources \
+            --exclude-task packageDebugResources
+
+      # 3. 上传产物（注意路径改为 JAR）
+      - name: Upload Core Jar
         uses: actions/upload-artifact@v4
         with:
-          name: 编译成品-ARM64-v8a
+          name: 编译成品-ARM64-v8a-Jar
           path: app/build/outputs/apk/debug/app-debug.apk
