@@ -12,7 +12,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1. 安装 ImageMagick 以解决图标生成问题
+      # 1. 安装依赖
       - name: Install ImageMagick
         run: sudo apt-get update && sudo apt-get install -y imagemagick
 
@@ -33,15 +33,18 @@ jobs:
             ~/.gradle/wrapper
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
 
-      # 2. 核心构建命令：只保留 Debug 和 ARM64-v8a，删掉多余参数
+      # 2. 核心修改：
+      #    - 使用 -R 参数替换资源，强制使用系统默认图标
+      #    - 彻底跳过 generateIcons 任务
       - name: Build ARM64-v8a APK
         env:
-          PATH: /usr/bin:$PATH  # 强制系统优先找到 magick
+          PATH: /usr/bin:$PATH
         run: |
           ./gradlew assembleDebug \
             -Pandroid.buildArchitectures=arm64-v8a \
-            --exclude-task generateIcons
-
+            --exclude-task generateIcons \
+            -R
+      
       # 3. 上传产物
       - name: Upload ARM64-v8a APK
         uses: actions/upload-artifact@v4
