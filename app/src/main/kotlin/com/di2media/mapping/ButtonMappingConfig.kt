@@ -26,6 +26,9 @@ class ButtonMappingConfig(context: Context) {
         return action as? HoldAction ?: HoldAction.NONE
     }
 
+    fun hasTripleAction(channel: Int): Boolean =
+        getInstantAction(channel, PressType.TRIPLE) != InstantAction.NONE
+
     fun getAllMappings(): Map<ButtonBinding, ButtonAction> = mappings.toMap()
 
     fun setMapping(binding: ButtonBinding, action: ButtonAction) {

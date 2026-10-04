@@ -16,6 +16,7 @@ import com.di2media.MainActivity
 import com.di2media.R
 import com.di2media.mapping.ActionDispatcher
 import com.di2media.mapping.ButtonMappingConfig
+import com.di2media.mapping.ClickCounter
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -64,6 +65,7 @@ class Di2BleService : Service() {
     private var lastPressTypes = mutableMapOf<Int, PressType?>()
 
     private lateinit var dispatcher: ActionDispatcher
+    private lateinit var clickCounter: ClickCounter
     lateinit var mappingConfig: ButtonMappingConfig
         private set
 
@@ -73,6 +75,12 @@ class Di2BleService : Service() {
         super.onCreate()
         dispatcher = ActionDispatcher(this)
         mappingConfig = ButtonMappingConfig(this)
+        clickCounter = ClickCounter(
+            isTripleEnabled = { ch -> mappingConfig.hasTripleAction(ch) },
+            onShort = { ch -> dispatcher.dispatch(mappingConfig.getInstantAction(ch, PressType.SHORT)) },
+            onDouble = { ch -> dispatcher.dispatch(mappingConfig.getInstantAction(ch, PressType.DOUBLE)) },
+            onTriple = { ch -> dispatcher.dispatch(mappingConfig.getInstantAction(ch, PressType.TRIPLE)) },
+        )
         createNotificationChannel()
     }
 
@@ -89,6 +97,7 @@ class Di2BleService : Service() {
     override fun onDestroy() {
         stopScan()
         bluetoothGatt?.close()
+        if (::clickCounter.isInitialized) clickCounter.cancelAll()
         if (::dispatcher.isInitialized) dispatcher.destroy()
         super.onDestroy()
     }
@@ -177,6 +186,7 @@ class Di2BleService : Service() {
         bluetoothGatt?.disconnect()
         bluetoothGatt?.close()
         bluetoothGatt = null
+        clickCounter.cancelAll()
         _connectionState.value = ConnectionState.DISCONNECTED
         _channelStates.value = emptyMap()
         initialized = false
@@ -295,10 +305,10 @@ class Di2BleService : Service() {
 
                 val prevPressType = lastPressTypes[channel]
                 when {
-                    pressType == PressType.SHORT || pressType == PressType.DOUBLE -> {
-                        dispatcher.dispatch(mappingConfig.getInstantAction(channel, pressType))
-                    }
+                    pressType == PressType.SHORT -> clickCounter.onShortPress(channel)
+                    pressType == PressType.DOUBLE -> clickCounter.onDoublePress(channel)
                     pressType == PressType.LONG -> {
+                        clickCounter.onLongPress(channel)
                         dispatcher.onHoldStart(channel, mappingConfig.getHoldAction(channel))
                     }
                     pressType == null && prevPressType == PressType.LONG -> {
@@ -357,5 +367,6 @@ class Di2BleService : Service() {
 }
 
 enum class ConnectionState { DISCONNECTED, SCANNING, CONNECTING, CONNECTED }
-enum class PressType { SHORT, LONG, DOUBLE }
+// TRIPLE is synthesized in software (ClickCounter); the Di2 unit never reports it.
+enum class PressType { SHORT, LONG, DOUBLE, TRIPLE }
 data class DiscoveredDevice(val name: String, val address: String, val rssi: Int)

@@ -61,6 +61,13 @@ fun ChannelConfigScreen(
                 onSelected = { onMappingChanged(PressType.DOUBLE, it) }
             )
 
+            ActionSection(
+                title = "Triple Press",
+                selected = currentMappings.triple,
+                options = InstantAction.entries,
+                onSelected = { onMappingChanged(PressType.TRIPLE, it) }
+            )
+
             Spacer(Modifier.height(16.dp))
         }
     }

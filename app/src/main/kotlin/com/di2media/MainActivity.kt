@@ -74,6 +74,7 @@ class MainActivity : ComponentActivity() {
                         short = config.getAction(ch, PressType.SHORT),
                         long = config.getAction(ch, PressType.LONG),
                         double = config.getAction(ch, PressType.DOUBLE),
+                        triple = config.getAction(ch, PressType.TRIPLE),
                     )
                 }
 

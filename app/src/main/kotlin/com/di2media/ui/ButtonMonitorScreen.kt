@@ -25,6 +25,7 @@ data class ChannelMappings(
     val short: ButtonAction,
     val long: ButtonAction,
     val double: ButtonAction,
+    val triple: ButtonAction,
 )
 
 @Composable
@@ -91,6 +92,7 @@ private fun ChannelIndicator(
             PressType.SHORT -> Color(0xFF2196F3)  // blue
             PressType.LONG -> Color(0xFFFF9800)    // orange
             PressType.DOUBLE -> Color(0xFF4CAF50)  // green
+            PressType.TRIPLE -> Color(0xFF9C27B0)  // purple
             null -> Color(0xFF424242)              // gray
         },
         animationSpec = tween(durationMillis = 150),
@@ -101,6 +103,7 @@ private fun ChannelIndicator(
         PressType.SHORT -> "Short Press"
         PressType.LONG -> "Long Press"
         PressType.DOUBLE -> "Double Press"
+        PressType.TRIPLE -> "Triple Press"
         null -> "Idle"
     }
 
@@ -137,6 +140,7 @@ private fun ChannelIndicator(
             MappingLabel("S", mappings.short.label)
             MappingLabel("L", mappings.long.label)
             MappingLabel("D", mappings.double.label)
+            MappingLabel("T", mappings.triple.label)
         }
     }
 }
