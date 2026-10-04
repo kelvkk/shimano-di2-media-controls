@@ -75,6 +75,7 @@ class MainActivity : ComponentActivity() {
                         long = config.getAction(ch, PressType.LONG),
                         double = config.getAction(ch, PressType.DOUBLE),
                         triple = config.getAction(ch, PressType.TRIPLE),
+                        shortLong = config.getAction(ch, PressType.SHORT_LONG),
                     )
                 }
 
@@ -91,6 +92,8 @@ class MainActivity : ComponentActivity() {
                         },
                         tripleWindowMs = service.mappingConfig.getTripleWindowMs(),
                         onTripleWindowChanged = { service.mappingConfig.setTripleWindowMs(it) },
+                        shortLongWindowMs = service.mappingConfig.getShortLongWindowMs(),
+                        onShortLongWindowChanged = { service.mappingConfig.setShortLongWindowMs(it) },
                         onBack = { selectedChannel.value = null }
                     )
                     connectionState == ConnectionState.CONNECTED -> ButtonMonitorScreen(

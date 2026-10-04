@@ -77,7 +77,9 @@ class Di2BleService : Service() {
         mappingConfig = ButtonMappingConfig(this)
         clickCounter = ClickCounter(
             windowMs = { mappingConfig.getTripleWindowMs().toLong() },
+            shortLongWindowMs = { mappingConfig.getShortLongWindowMs().toLong() },
             isTripleEnabled = { ch -> mappingConfig.hasTripleAction(ch) },
+            isShortLongEnabled = { ch -> mappingConfig.hasShortLongAction(ch) },
             onShort = { ch -> dispatcher.dispatch(mappingConfig.getInstantAction(ch, PressType.SHORT)) },
             onDouble = { ch -> dispatcher.dispatch(mappingConfig.getInstantAction(ch, PressType.DOUBLE)) },
             onTriple = { ch -> dispatcher.dispatch(mappingConfig.getInstantAction(ch, PressType.TRIPLE)) },
@@ -309,8 +311,9 @@ class Di2BleService : Service() {
                     pressType == PressType.SHORT -> clickCounter.onShortPress(channel)
                     pressType == PressType.DOUBLE -> clickCounter.onDoublePress(channel)
                     pressType == PressType.LONG -> {
-                        clickCounter.onLongPress(channel)
-                        dispatcher.onHoldStart(channel, mappingConfig.getHoldAction(channel))
+                        val isShortLong = clickCounter.onLongPress(channel)
+                        val holdType = if (isShortLong) PressType.SHORT_LONG else PressType.LONG
+                        dispatcher.onHoldStart(channel, mappingConfig.getHoldAction(channel, holdType))
                     }
                     pressType == null && prevPressType == PressType.LONG -> {
                         dispatcher.onHoldStop(channel)
@@ -368,6 +371,6 @@ class Di2BleService : Service() {
 }
 
 enum class ConnectionState { DISCONNECTED, SCANNING, CONNECTING, CONNECTED }
-// TRIPLE is synthesized in software (ClickCounter); the Di2 unit never reports it.
-enum class PressType { SHORT, LONG, DOUBLE, TRIPLE }
+// TRIPLE and SHORT_LONG are synthesized in software (ClickCounter); the Di2 unit never reports them.
+enum class PressType { SHORT, LONG, DOUBLE, TRIPLE, SHORT_LONG }
 data class DiscoveredDevice(val name: String, val address: String, val rssi: Int)

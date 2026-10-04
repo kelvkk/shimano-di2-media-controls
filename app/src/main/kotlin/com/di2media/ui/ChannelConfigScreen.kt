@@ -26,6 +26,8 @@ fun ChannelConfigScreen(
     onMappingChanged: (PressType, ButtonAction) -> Unit,
     tripleWindowMs: Int,
     onTripleWindowChanged: (Int) -> Unit,
+    shortLongWindowMs: Int,
+    onShortLongWindowChanged: (Int) -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(
@@ -74,25 +76,30 @@ fun ChannelConfigScreen(
                 onSelected = { onMappingChanged(PressType.TRIPLE, it) }
             )
 
-            var windowValue by remember { mutableStateOf(tripleWindowMs.toFloat()) }
-            Column {
-                Text(
-                    "Triple press window: ${windowValue.toInt()} ms",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    "Max time between clicks. Increase if triple press is detected as double + single.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Slider(
-                    value = windowValue,
-                    onValueChange = { windowValue = it },
-                    onValueChangeFinished = { onTripleWindowChanged(windowValue.toInt()) },
-                    valueRange = 300f..1500f,
-                    steps = 11
-                )
-            }
+            ActionSection(
+                title = "Short then Long Press",
+                selected = currentMappings.shortLong,
+                options = HoldAction.entries,
+                onSelected = { onMappingChanged(PressType.SHORT_LONG, it) }
+            )
+
+            WindowSlider(
+                title = "Triple press window",
+                description = "Max time between clicks. Increase if triple press is detected as double + single.",
+                initialMs = tripleWindowMs,
+                range = 300f..1500f,
+                steps = 11,
+                onFinished = onTripleWindowChanged
+            )
+
+            WindowSlider(
+                title = "Short then long window",
+                description = "Max time from the short press until the long press starts. Increase if it is detected as short + long separately.",
+                initialMs = shortLongWindowMs,
+                range = 500f..2500f,
+                steps = 19,
+                onFinished = onShortLongWindowChanged
+            )
 
             Spacer(Modifier.height(16.dp))
         }
@@ -131,5 +138,32 @@ private fun <T : ButtonAction> ActionSection(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun WindowSlider(
+    title: String,
+    description: String,
+    initialMs: Int,
+    range: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    onFinished: (Int) -> Unit,
+) {
+    var value by remember { mutableStateOf(initialMs.toFloat()) }
+    Column {
+        Text("$title: ${value.toInt()} ms", style = MaterialTheme.typography.titleMedium)
+        Text(
+            description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Slider(
+            value = value,
+            onValueChange = { value = it },
+            onValueChangeFinished = { onFinished(value.toInt()) },
+            valueRange = range,
+            steps = steps
+        )
     }
 }

@@ -13,7 +13,7 @@ class ButtonMappingConfig(context: Context) {
 
     fun getAction(channel: Int, pressType: PressType): ButtonAction {
         return mappings[ButtonBinding(channel, pressType)]
-            ?: if (pressType == PressType.LONG) HoldAction.NONE else InstantAction.NONE
+            ?: if (pressType == PressType.LONG || pressType == PressType.SHORT_LONG) HoldAction.NONE else InstantAction.NONE
     }
 
     fun getInstantAction(channel: Int, pressType: PressType): InstantAction {
@@ -21,8 +21,8 @@ class ButtonMappingConfig(context: Context) {
         return action as? InstantAction ?: InstantAction.NONE
     }
 
-    fun getHoldAction(channel: Int): HoldAction {
-        val action = getAction(channel, PressType.LONG)
+    fun getHoldAction(channel: Int, pressType: PressType = PressType.LONG): HoldAction {
+        val action = getAction(channel, pressType)
         return action as? HoldAction ?: HoldAction.NONE
     }
 
@@ -31,6 +31,15 @@ class ButtonMappingConfig(context: Context) {
     fun setTripleWindowMs(ms: Int) {
         prefs.edit().putInt("triple_window_ms", ms).apply()
     }
+
+    fun getShortLongWindowMs(): Int = prefs.getInt("short_long_window_ms", DEFAULT_SHORT_LONG_WINDOW_MS)
+
+    fun setShortLongWindowMs(ms: Int) {
+        prefs.edit().putInt("short_long_window_ms", ms).apply()
+    }
+
+    fun hasShortLongAction(channel: Int): Boolean =
+        getHoldAction(channel, PressType.SHORT_LONG) != HoldAction.NONE
 
     fun hasTripleAction(channel: Int): Boolean =
         getInstantAction(channel, PressType.TRIPLE) != InstantAction.NONE
@@ -75,6 +84,7 @@ class ButtonMappingConfig(context: Context) {
 
     companion object {
         const val DEFAULT_TRIPLE_WINDOW_MS = 700
+        const val DEFAULT_SHORT_LONG_WINDOW_MS = 1000
 
         fun defaultMappings(): Map<ButtonBinding, ButtonAction> = mapOf(
             ButtonBinding(1, PressType.SHORT) to InstantAction.PREVIOUS,
