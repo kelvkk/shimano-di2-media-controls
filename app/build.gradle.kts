@@ -24,6 +24,10 @@ val generateIcons by tasks.registering(Exec::class) {
 
 tasks.named("preBuild") { dependsOn(generateIcons) }
 
+// Release signing is injected by CI (GitHub Secrets) so the key never lives in the repo.
+// Without it the build falls back to the default debug key (local builds).
+val ciKeystorePath: String? = System.getenv("SIGNING_KEYSTORE_PATH")
+
 android {
     namespace = "com.di2media"
     compileSdk = 35
@@ -32,7 +36,8 @@ android {
         applicationId = "com.di2media"
         minSdk = 26
         targetSdk = 34
-        versionCode = 3
+        // CI run number keeps increasing, so every build can upgrade the previous one.
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 3
         versionName = "20261004v3"
     }
 
@@ -40,14 +45,25 @@ android {
         named("debug") {
             // Use default debug keystore at ~/.android/debug.keystore
         }
+        if (ciKeystorePath != null) {
+            create("ci") {
+                storeFile = file(ciKeystorePath)
+                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
+        getByName("debug") {
+            if (ciKeystorePath != null) signingConfig = signingConfigs.getByName("ci")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (ciKeystorePath != null) "ci" else "debug")
         }
     }
 
