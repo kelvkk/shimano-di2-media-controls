@@ -307,16 +307,26 @@ class Di2BleService : Service() {
                 Log.i(TAG, "CH$channel: ${pressType?.name ?: "RELEASED"}")
 
                 val prevPressType = lastPressTypes[channel]
+
+                // Leaving a hold (button released, or the unit reports another event): stop it.
+                if (prevPressType == PressType.LONG && pressType != PressType.LONG) {
+                    dispatcher.onHoldStop(channel)
+                }
+
                 when {
                     pressType == PressType.SHORT -> clickCounter.onShortPress(channel)
                     pressType == PressType.DOUBLE -> clickCounter.onDoublePress(channel)
                     pressType == PressType.LONG -> {
-                        val isShortLong = clickCounter.onLongPress(channel)
-                        val holdType = if (isShortLong) PressType.SHORT_LONG else PressType.LONG
-                        dispatcher.onHoldStart(channel, mappingConfig.getHoldAction(channel, holdType))
-                    }
-                    pressType == null && prevPressType == PressType.LONG -> {
-                        dispatcher.onHoldStop(channel)
+                        // The unit can send several frames while the button stays held.
+                        // Only the first one starts the hold; later ones must not restart it
+                        // (restarting would drop the short-then-long action for the plain long action).
+                        if (prevPressType != PressType.LONG) {
+                            val isShortLong = clickCounter.onLongPress(channel)
+                            val holdType = if (isShortLong) PressType.SHORT_LONG else PressType.LONG
+                            dispatcher.onHoldStart(channel, mappingConfig.getHoldAction(channel, holdType))
+                        } else {
+                            Log.i(TAG, "CH$channel: repeated long frame ignored (hold in progress)")
+                        }
                     }
                 }
                 lastPressTypes[channel] = pressType
