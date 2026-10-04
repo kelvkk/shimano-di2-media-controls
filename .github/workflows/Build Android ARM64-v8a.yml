@@ -5,6 +5,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  # Change only this line when you want a new version name for the APK.
+  APP_VERSION: 20261004v3
+
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -34,15 +38,33 @@ jobs:
           sudo apt-get install -y -qq imagemagick
           command -v magick || sudo ln -s "$(command -v convert)" /usr/local/bin/magick
 
+      # Fixed signing key (kept in GitHub Secrets) so new versions install over old ones.
+      - name: Restore signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+            echo "Signing key restored"
+          else
+            echo "No KEYSTORE_BASE64 secret set, using the default debug key"
+          fi
+
       - name: Build debug APK
+        env:
+          SIGNING_STORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: di2media
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk di2-media-controls-20261004v3-fix.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk "di2-media-controls-${APP_VERSION}.apk"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: di2-media-controls-20261004v3-fix
-          path: di2-media-controls-20261004v3-fix.apk
+          name: di2-media-controls-${{ env.APP_VERSION }}
+          path: di2-media-controls-${{ env.APP_VERSION }}.apk
+          if-no-files-found: error
