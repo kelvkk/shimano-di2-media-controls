@@ -40,9 +40,9 @@ jobs:
           ./gradlew assembleDebug
 
       - name: Rename APK
-        run: cp app/build/outputs/apk/debug/app-debug.apk di2-media-controls-20261004v3.apk
+        run: cp app/build/outputs/apk/debug/app-debug.apk di2-media-controls-20261004v3-fix.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: di2-media-controls-20261004v3
-          path: di2-media-controls-20261004v3.apk
+          name: di2-media-controls-20261004v3-fix
+          path: di2-media-controls-20261004v3-fix.apk
