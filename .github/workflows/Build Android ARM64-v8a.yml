@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -39,7 +39,10 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
+      - name: Rename APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk di2-media-controls-20261004v3.apk
+
       - uses: actions/upload-artifact@v4
         with:
-          name: di2-media-controls-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: di2-media-controls-20261004v3
+          path: di2-media-controls-20261004v3.apk
