@@ -21,6 +21,9 @@ fun DeviceSetupScreen(
     onScanClick: () -> Unit,
     onDeviceClick: (String) -> Unit,
     onDisconnectClick: () -> Unit,
+    savedAddress: String? = null,
+    onReconnectClick: () -> Unit = {},
+    onForgetClick: () -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -37,8 +40,25 @@ fun DeviceSetupScreen(
 
         when (connectionState) {
             ConnectionState.DISCONNECTED -> {
-                Button(onClick = onScanClick, modifier = Modifier.fillMaxWidth()) {
-                    Text("Scan for Di2 Devices")
+                if (savedAddress != null) {
+                    Button(onClick = onReconnectClick, modifier = Modifier.fillMaxWidth()) {
+                        Text("Reconnect to saved device")
+                    }
+                    Text(
+                        savedAddress,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedButton(onClick = onScanClick, modifier = Modifier.fillMaxWidth()) {
+                        Text("Scan for a different device")
+                    }
+                    TextButton(onClick = onForgetClick) {
+                        Text("Forget saved device")
+                    }
+                } else {
+                    Button(onClick = onScanClick, modifier = Modifier.fillMaxWidth()) {
+                        Text("Scan for Di2 Devices")
+                    }
                 }
             }
             ConnectionState.SCANNING -> {
@@ -57,6 +77,9 @@ fun DeviceSetupScreen(
                 ) {
                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
                     Text("Connecting...")
+                }
+                OutlinedButton(onClick = onDisconnectClick, modifier = Modifier.fillMaxWidth()) {
+                    Text("Cancel")
                 }
             }
             ConnectionState.CONNECTED -> {

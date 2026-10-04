@@ -7,11 +7,16 @@ import android.app.PendingIntent
 import android.app.Service
 import android.bluetooth.*
 import android.bluetooth.le.*
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Binder
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.di2media.MainActivity
 import com.di2media.R
 import com.di2media.mapping.ActionDispatcher
@@ -29,6 +34,9 @@ class Di2BleService : Service() {
         const val CHANNEL_ID = "di2_media_channel"
         const val NOTIFICATION_ID = 1
         const val ACTION_DISCONNECT = "com.di2media.ACTION_DISCONNECT"
+        const val PREFS_NAME = "di2_device"
+        const val KEY_SAVED_ADDRESS = "saved_address"
+        const val RECONNECT_DELAY_MS = 1500L
 
         val DI2_SERVICE_UUID: UUID = UUID.fromString("000018ef-5348-494d-414e-4f5f424c4500")
         val DI2_BUTTON_CHAR_UUID: UUID = UUID.fromString("00002ac2-5348-494d-414e-4f5f424c4500")
@@ -42,6 +50,16 @@ class Di2BleService : Service() {
     private val binder = LocalBinder()
     private var bluetoothGatt: BluetoothGatt? = null
     private var scanning = false
+
+    // ── Remembered device / auto reconnect ──
+    private val handler = Handler(Looper.getMainLooper())
+    private val devicePrefs by lazy { getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
+    private var userDisconnected = false
+    private var reconnectRunnable: Runnable? = null
+
+    /** MAC address of the last device we connected to successfully, or null. */
+    val savedAddress: String?
+        get() = devicePrefs.getString(KEY_SAVED_ADDRESS, null)
 
     private val bluetoothAdapter: BluetoothAdapter? by lazy {
         (getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager).adapter
@@ -69,6 +87,27 @@ class Di2BleService : Service() {
     lateinit var mappingConfig: ButtonMappingConfig
         private set
 
+    // Reconnect automatically when Bluetooth is switched back on.
+    private val bluetoothStateReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
+                BluetoothAdapter.STATE_ON -> {
+                    if (!userDisconnected) autoConnectIfSaved()
+                }
+                BluetoothAdapter.STATE_TURNING_OFF -> {
+                    cancelReconnect()
+                    bluetoothGatt?.close()
+                    bluetoothGatt = null
+                    releaseAllHolds()
+                    initialized = false
+                    lastChannelValues = null
+                    _channelStates.value = emptyMap()
+                    _connectionState.value = ConnectionState.DISCONNECTED
+                }
+            }
+        }
+    }
+
     // ── Lifecycle ───────────────────────────────────────────────
 
     override fun onCreate() {
@@ -85,6 +124,11 @@ class Di2BleService : Service() {
             onTriple = { ch -> dispatcher.dispatch(mappingConfig.getInstantAction(ch, PressType.TRIPLE)) },
         )
         createNotificationChannel()
+        ContextCompat.registerReceiver(
+            this, bluetoothStateReceiver,
+            IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -98,6 +142,11 @@ class Di2BleService : Service() {
     override fun onBind(intent: Intent?): IBinder = binder
 
     override fun onDestroy() {
+        try {
+            unregisterReceiver(bluetoothStateReceiver)
+        } catch (_: Exception) {
+        }
+        cancelReconnect()
         stopScan()
         bluetoothGatt?.close()
         if (::clickCounter.isInitialized) clickCounter.cancelAll()
@@ -176,20 +225,52 @@ class Di2BleService : Service() {
 
     // ── GATT Connection ─────────────────────────────────────────
 
-    fun connectToDevice(address: String) {
+    /**
+     * Connects to a device. [autoConnect] = true lets Android keep trying in the background
+     * until the device shows up (used for the remembered device).
+     */
+    fun connectToDevice(address: String, autoConnect: Boolean = false) {
         stopScan()
+        cancelReconnect()
+        userDisconnected = false
         val device = bluetoothAdapter?.getRemoteDevice(address) ?: return
+        bluetoothGatt?.close()
         _connectionState.value = ConnectionState.CONNECTING
         initialized = false
         lastChannelValues = null
-        bluetoothGatt = device.connectGatt(this, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
+        lastPressTypes.clear()
+        try {
+            startForeground(NOTIFICATION_ID, buildNotification("Connecting"))
+        } catch (e: Exception) {
+            Log.w(TAG, "startForeground failed", e)
+        }
+        bluetoothGatt = device.connectGatt(this, autoConnect, gattCallback, BluetoothDevice.TRANSPORT_LE)
+    }
+
+    /**
+     * Called when the app is opened: connect to the remembered device without scanning.
+     * Opening the app counts as "I want to connect", so an earlier manual Disconnect is ignored.
+     */
+    fun autoConnectIfSaved() {
+        if (_connectionState.value != ConnectionState.DISCONNECTED) return
+        val address = savedAddress ?: return
+        if (bluetoothAdapter?.isEnabled != true) return
+        Log.i(TAG, "Auto-connecting to saved device $address")
+        connectToDevice(address)
+    }
+
+    fun forgetDevice() {
+        devicePrefs.edit().remove(KEY_SAVED_ADDRESS).apply()
+        disconnect()
     }
 
     fun disconnect() {
+        userDisconnected = true
+        cancelReconnect()
         bluetoothGatt?.disconnect()
         bluetoothGatt?.close()
         bluetoothGatt = null
-        clickCounter.cancelAll()
+        releaseAllHolds()
         _connectionState.value = ConnectionState.DISCONNECTED
         _channelStates.value = emptyMap()
         initialized = false
@@ -204,6 +285,38 @@ class Di2BleService : Service() {
         stopSelf()
     }
 
+    /** Stops running volume ramps and pending click detection (e.g. when the link drops mid-hold). */
+    private fun releaseAllHolds() {
+        if (::clickCounter.isInitialized) clickCounter.cancelAll()
+        if (::dispatcher.isInitialized) {
+            lastPressTypes.forEach { (channel, type) ->
+                if (type == PressType.LONG) dispatcher.onHoldStop(channel)
+            }
+        }
+        lastPressTypes.clear()
+    }
+
+    private fun scheduleReconnect() {
+        cancelReconnect()
+        val r = Runnable {
+            reconnectRunnable = null
+            val address = savedAddress
+            if (!userDisconnected && address != null && bluetoothAdapter?.isEnabled == true) {
+                Log.i(TAG, "Reconnecting to saved device $address")
+                connectToDevice(address, autoConnect = true)
+            } else {
+                _connectionState.value = ConnectionState.DISCONNECTED
+            }
+        }
+        reconnectRunnable = r
+        handler.postDelayed(r, RECONNECT_DELAY_MS)
+    }
+
+    private fun cancelReconnect() {
+        reconnectRunnable?.let { handler.removeCallbacks(it) }
+        reconnectRunnable = null
+    }
+
     @Suppress("DEPRECATION")
     private val gattCallback = object : BluetoothGattCallback() {
 
@@ -211,16 +324,29 @@ class Di2BleService : Service() {
             when (newState) {
                 BluetoothProfile.STATE_CONNECTED -> {
                     Log.i(TAG, "Connected to Di2")
+                    devicePrefs.edit().putString(KEY_SAVED_ADDRESS, gatt.device.address).apply()
                     _connectionState.value = ConnectionState.CONNECTED
                     gatt.discoverServices()
                     updateNotification("Connected")
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     Log.i(TAG, "Disconnected from Di2")
-                    _connectionState.value = ConnectionState.DISCONNECTED
+                    releaseAllHolds()
                     _channelStates.value = emptyMap()
-                    updateNotification("Disconnected")
+                    initialized = false
+                    lastChannelValues = null
                     gatt.close()
+                    if (bluetoothGatt === gatt) bluetoothGatt = null
+
+                    // Link dropped (bike off, out of range...): keep trying to reach the remembered device.
+                    if (!userDisconnected && gatt.device.address == savedAddress) {
+                        _connectionState.value = ConnectionState.CONNECTING
+                        updateNotification("Reconnecting")
+                        scheduleReconnect()
+                    } else {
+                        _connectionState.value = ConnectionState.DISCONNECTED
+                        updateNotification("Disconnected")
+                    }
                 }
             }
         }

@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity() {
     private val bleService = mutableStateOf<Di2BleService?>(null)
     private val selectedChannel = mutableStateOf<Int?>(null)
     private val mappingVersion = mutableStateOf(0)
+    private var freshLaunch = false
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -45,7 +46,12 @@ class MainActivity : ComponentActivity() {
 
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-            bleService.value = (binder as Di2BleService.LocalBinder).getService()
+            val service = (binder as Di2BleService.LocalBinder).getService()
+            bleService.value = service
+            if (freshLaunch) {
+                freshLaunch = false
+                service.autoConnectIfSaved()
+            }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -55,6 +61,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        freshLaunch = savedInstanceState == null
         requestPermissionsAndStart()
 
         setContent {
@@ -107,7 +114,13 @@ class MainActivity : ComponentActivity() {
                         devices = devices,
                         onScanClick = { service.startScan() },
                         onDeviceClick = { address -> service.connectToDevice(address) },
-                        onDisconnectClick = { service.disconnect() }
+                        onDisconnectClick = { service.disconnect() },
+                        savedAddress = service.savedAddress,
+                        onReconnectClick = { service.savedAddress?.let { service.connectToDevice(it) } },
+                        onForgetClick = {
+                            service.forgetDevice()
+                            mappingVersion.value++
+                        }
                     )
                 }
             }
@@ -144,6 +157,8 @@ class MainActivity : ComponentActivity() {
 
     private fun startAndBindService() {
         val intent = Intent(this, Di2BleService::class.java)
+        // Started (not only bound) so the connection survives when the UI is closed.
+        startService(intent)
         bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 }
