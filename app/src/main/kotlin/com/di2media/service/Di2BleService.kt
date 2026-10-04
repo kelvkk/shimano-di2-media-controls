@@ -76,6 +76,7 @@ class Di2BleService : Service() {
         dispatcher = ActionDispatcher(this)
         mappingConfig = ButtonMappingConfig(this)
         clickCounter = ClickCounter(
+            windowMs = { mappingConfig.getTripleWindowMs().toLong() },
             isTripleEnabled = { ch -> mappingConfig.hasTripleAction(ch) },
             onShort = { ch -> dispatcher.dispatch(mappingConfig.getInstantAction(ch, PressType.SHORT)) },
             onDouble = { ch -> dispatcher.dispatch(mappingConfig.getInstantAction(ch, PressType.DOUBLE)) },

@@ -26,6 +26,12 @@ class ButtonMappingConfig(context: Context) {
         return action as? HoldAction ?: HoldAction.NONE
     }
 
+    fun getTripleWindowMs(): Int = prefs.getInt("triple_window_ms", DEFAULT_TRIPLE_WINDOW_MS)
+
+    fun setTripleWindowMs(ms: Int) {
+        prefs.edit().putInt("triple_window_ms", ms).apply()
+    }
+
     fun hasTripleAction(channel: Int): Boolean =
         getInstantAction(channel, PressType.TRIPLE) != InstantAction.NONE
 
@@ -68,6 +74,8 @@ class ButtonMappingConfig(context: Context) {
     }
 
     companion object {
+        const val DEFAULT_TRIPLE_WINDOW_MS = 700
+
         fun defaultMappings(): Map<ButtonBinding, ButtonAction> = mapOf(
             ButtonBinding(1, PressType.SHORT) to InstantAction.PREVIOUS,
             ButtonBinding(1, PressType.LONG) to HoldAction.NONE,

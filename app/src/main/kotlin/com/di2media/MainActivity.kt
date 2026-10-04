@@ -89,6 +89,8 @@ class MainActivity : ComponentActivity() {
                             )
                             mappingVersion.value++
                         },
+                        tripleWindowMs = service.mappingConfig.getTripleWindowMs(),
+                        onTripleWindowChanged = { service.mappingConfig.setTripleWindowMs(it) },
                         onBack = { selectedChannel.value = null }
                     )
                     connectionState == ConnectionState.CONNECTED -> ButtonMonitorScreen(

@@ -7,6 +7,10 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -20,6 +24,8 @@ fun ChannelConfigScreen(
     channel: Int,
     currentMappings: ChannelMappings,
     onMappingChanged: (PressType, ButtonAction) -> Unit,
+    tripleWindowMs: Int,
+    onTripleWindowChanged: (Int) -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(
@@ -67,6 +73,26 @@ fun ChannelConfigScreen(
                 options = InstantAction.entries,
                 onSelected = { onMappingChanged(PressType.TRIPLE, it) }
             )
+
+            var windowValue by remember { mutableStateOf(tripleWindowMs.toFloat()) }
+            Column {
+                Text(
+                    "Triple press window: ${windowValue.toInt()} ms",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    "Max time between clicks. Increase if triple press is detected as double + single.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Slider(
+                    value = windowValue,
+                    onValueChange = { windowValue = it },
+                    onValueChangeFinished = { onTripleWindowChanged(windowValue.toInt()) },
+                    valueRange = 300f..1500f,
+                    steps = 11
+                )
+            }
 
             Spacer(Modifier.height(16.dp))
         }
