@@ -16,7 +16,13 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - uses: android-actions/setup-android@v3
+      # The runner already has the Android SDK preinstalled (ANDROID_HOME).
+      # Just accept licenses and make sure the platform used by the project exists.
+      - name: Prepare Android SDK
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" "platforms;android-35"
 
       - uses: gradle/actions/setup-gradle@v4
 
