@@ -7,7 +7,7 @@ on:
 
 env:
   # Change only this line when you want a new version name for the APK.
-  APP_VERSION: 20261004v4
+  APP_VERSION: 20261005v5
 
 jobs:
   build:
