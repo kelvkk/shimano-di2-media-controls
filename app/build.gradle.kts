@@ -38,7 +38,8 @@ android {
         targetSdk = 34
         // CI run number keeps increasing, so every build can upgrade the previous one.
         versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 3
-        versionName = "20261004v3"
+        // Shown in the Android app info; comes from APP_VERSION in .github/workflows/build-apk.yml
+        versionName = System.getenv("APP_VERSION") ?: "dev"
     }
 
     signingConfigs {
