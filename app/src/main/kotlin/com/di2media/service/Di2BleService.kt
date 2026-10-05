@@ -37,6 +37,8 @@ class Di2BleService : Service() {
         const val PREFS_NAME = "di2_device"
         const val KEY_SAVED_ADDRESS = "saved_address"
         const val RECONNECT_DELAY_MS = 1500L
+        const val KEY_RECONNECT_TIMEOUT_MIN = "reconnect_timeout_min"
+        const val DEFAULT_RECONNECT_TIMEOUT_MIN = 10
 
         val DI2_SERVICE_UUID: UUID = UUID.fromString("000018ef-5348-494d-414e-4f5f424c4500")
         val DI2_BUTTON_CHAR_UUID: UUID = UUID.fromString("00002ac2-5348-494d-414e-4f5f424c4500")
@@ -56,6 +58,19 @@ class Di2BleService : Service() {
     private val devicePrefs by lazy { getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
     private var userDisconnected = false
     private var reconnectRunnable: Runnable? = null
+    private var giveUpRunnable: Runnable? = null
+
+    /** True after the search for the remembered device was stopped by the timeout. */
+    var searchGaveUp = false
+        private set
+
+    /** Minutes without a connection before searching stops (0 = never stop). */
+    fun getReconnectTimeoutMin(): Int =
+        devicePrefs.getInt(KEY_RECONNECT_TIMEOUT_MIN, DEFAULT_RECONNECT_TIMEOUT_MIN)
+
+    fun setReconnectTimeoutMin(minutes: Int) {
+        devicePrefs.edit().putInt(KEY_RECONNECT_TIMEOUT_MIN, minutes).apply()
+    }
 
     /** MAC address of the last device we connected to successfully, or null. */
     val savedAddress: String?
@@ -92,10 +107,11 @@ class Di2BleService : Service() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, BluetoothAdapter.ERROR)) {
                 BluetoothAdapter.STATE_ON -> {
-                    if (!userDisconnected) autoConnectIfSaved()
+                    if (!userDisconnected && !searchGaveUp) autoConnectIfSaved()
                 }
                 BluetoothAdapter.STATE_TURNING_OFF -> {
                     cancelReconnect()
+                    cancelSearchTimer()
                     bluetoothGatt?.close()
                     bluetoothGatt = null
                     releaseAllHolds()
@@ -147,6 +163,7 @@ class Di2BleService : Service() {
         } catch (_: Exception) {
         }
         cancelReconnect()
+        cancelSearchTimer()
         stopScan()
         bluetoothGatt?.close()
         if (::clickCounter.isInitialized) clickCounter.cancelAll()
@@ -233,6 +250,9 @@ class Di2BleService : Service() {
         stopScan()
         cancelReconnect()
         userDisconnected = false
+        searchGaveUp = false
+        // The give-up timer runs from the first attempt until we connect (it is not restarted by retries).
+        if (address == savedAddress) startSearchTimer() else cancelSearchTimer()
         val device = bluetoothAdapter?.getRemoteDevice(address) ?: return
         bluetoothGatt?.close()
         _connectionState.value = ConnectionState.CONNECTING
@@ -267,6 +287,7 @@ class Di2BleService : Service() {
     fun disconnect() {
         userDisconnected = true
         cancelReconnect()
+        cancelSearchTimer()
         bluetoothGatt?.disconnect()
         bluetoothGatt?.close()
         bluetoothGatt = null
@@ -317,6 +338,38 @@ class Di2BleService : Service() {
         reconnectRunnable = null
     }
 
+    private fun startSearchTimer() {
+        if (giveUpRunnable != null) return // already running, keep the original start time
+        val minutes = getReconnectTimeoutMin()
+        if (minutes <= 0) return // never stop
+        val r = Runnable { giveUpSearch() }
+        giveUpRunnable = r
+        handler.postDelayed(r, minutes * 60_000L)
+    }
+
+    private fun cancelSearchTimer() {
+        giveUpRunnable?.let { handler.removeCallbacks(it) }
+        giveUpRunnable = null
+    }
+
+    /** Stops searching for the remembered device to save battery. Opening the app searches again. */
+    private fun giveUpSearch() {
+        giveUpRunnable = null
+        if (_connectionState.value == ConnectionState.CONNECTED) return
+        Log.i(TAG, "No connection for ${getReconnectTimeoutMin()} min, stopping search")
+        searchGaveUp = true
+        cancelReconnect()
+        bluetoothGatt?.disconnect()
+        bluetoothGatt?.close()
+        bluetoothGatt = null
+        releaseAllHolds()
+        initialized = false
+        lastChannelValues = null
+        _channelStates.value = emptyMap()
+        _connectionState.value = ConnectionState.DISCONNECTED
+        stopForeground(STOP_FOREGROUND_REMOVE)
+    }
+
     @Suppress("DEPRECATION")
     private val gattCallback = object : BluetoothGattCallback() {
 
@@ -325,6 +378,7 @@ class Di2BleService : Service() {
                 BluetoothProfile.STATE_CONNECTED -> {
                     Log.i(TAG, "Connected to Di2")
                     devicePrefs.edit().putString(KEY_SAVED_ADDRESS, gatt.device.address).apply()
+                    cancelSearchTimer()
                     _connectionState.value = ConnectionState.CONNECTED
                     gatt.discoverServices()
                     updateNotification("Connected")

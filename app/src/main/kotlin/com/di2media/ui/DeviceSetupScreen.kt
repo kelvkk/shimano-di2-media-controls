@@ -6,6 +6,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -13,6 +17,7 @@ import com.di2media.R
 import androidx.compose.ui.unit.dp
 import com.di2media.service.ConnectionState
 import com.di2media.service.DiscoveredDevice
+import kotlin.math.roundToInt
 
 @Composable
 fun DeviceSetupScreen(
@@ -24,6 +29,8 @@ fun DeviceSetupScreen(
     savedAddress: String? = null,
     onReconnectClick: () -> Unit = {},
     onForgetClick: () -> Unit = {},
+    reconnectTimeoutMin: Int = 10,
+    onReconnectTimeoutChanged: (Int) -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -89,6 +96,12 @@ fun DeviceSetupScreen(
             }
         }
 
+        if (savedAddress != null &&
+            (connectionState == ConnectionState.DISCONNECTED || connectionState == ConnectionState.CONNECTING)
+        ) {
+            ReconnectTimeoutSetting(reconnectTimeoutMin, onReconnectTimeoutChanged)
+        }
+
         if (connectionState == ConnectionState.SCANNING && devices.isNotEmpty()) {
             Text(
                 "Tap a device to connect",
@@ -144,5 +157,33 @@ private fun DeviceCard(device: DiscoveredDevice, onClick: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+    }
+}
+
+private val TIMEOUT_OPTIONS = listOf(0, 1, 2, 5, 10, 15, 30, 60)
+
+@Composable
+private fun ReconnectTimeoutSetting(minutes: Int, onChanged: (Int) -> Unit) {
+    var index by remember {
+        mutableStateOf(TIMEOUT_OPTIONS.indexOf(minutes).let { if (it < 0) 4 else it }.toFloat())
+    }
+    val current = TIMEOUT_OPTIONS[index.roundToInt()]
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            if (current == 0) "Keep searching: never stop" else "Stop searching after $current min",
+            style = MaterialTheme.typography.titleMedium
+        )
+        Text(
+            "Without a connection for this long, the app stops searching to save battery. Opening the app searches again.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Slider(
+            value = index,
+            onValueChange = { index = it },
+            onValueChangeFinished = { onChanged(TIMEOUT_OPTIONS[index.roundToInt()]) },
+            valueRange = 0f..(TIMEOUT_OPTIONS.size - 1).toFloat(),
+            steps = TIMEOUT_OPTIONS.size - 2
+        )
     }
 }

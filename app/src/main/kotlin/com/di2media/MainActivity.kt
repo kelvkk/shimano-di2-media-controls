@@ -59,6 +59,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        // The app became visible again: if the search was stopped by the timeout, search again.
+        bleService.value?.let { if (it.searchGaveUp) it.autoConnectIfSaved() }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         freshLaunch = savedInstanceState == null
@@ -117,6 +123,8 @@ class MainActivity : ComponentActivity() {
                         onDisconnectClick = { service.disconnect() },
                         savedAddress = service.savedAddress,
                         onReconnectClick = { service.savedAddress?.let { service.connectToDevice(it) } },
+                        reconnectTimeoutMin = service.getReconnectTimeoutMin(),
+                        onReconnectTimeoutChanged = { service.setReconnectTimeoutMin(it) },
                         onForgetClick = {
                             service.forgetDevice()
                             mappingVersion.value++
