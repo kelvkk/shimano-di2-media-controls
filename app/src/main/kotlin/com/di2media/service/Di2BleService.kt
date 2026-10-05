@@ -15,6 +15,7 @@ import android.os.Binder
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.Process
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.di2media.MainActivity
@@ -39,6 +40,8 @@ class Di2BleService : Service() {
         const val RECONNECT_DELAY_MS = 1500L
         const val KEY_RECONNECT_TIMEOUT_MIN = "reconnect_timeout_min"
         const val DEFAULT_RECONNECT_TIMEOUT_MIN = 10
+        const val KEY_CLOSE_APP_ON_TIMEOUT = "close_app_on_timeout"
+        const val ACTION_CLOSE_APP = "com.di2media.ACTION_CLOSE_APP"
 
         val DI2_SERVICE_UUID: UUID = UUID.fromString("000018ef-5348-494d-414e-4f5f424c4500")
         val DI2_BUTTON_CHAR_UUID: UUID = UUID.fromString("00002ac2-5348-494d-414e-4f5f424c4500")
@@ -63,6 +66,18 @@ class Di2BleService : Service() {
     /** True after the search for the remembered device was stopped by the timeout. */
     var searchGaveUp = false
         private set
+
+    /** Set by the UI: true while the app is on screen. */
+    @Volatile
+    var uiVisible = false
+
+    /** When searching stops by timeout, also close the whole app (unless it is on screen). */
+    fun getCloseAppOnTimeout(): Boolean =
+        devicePrefs.getBoolean(KEY_CLOSE_APP_ON_TIMEOUT, false)
+
+    fun setCloseAppOnTimeout(enabled: Boolean) {
+        devicePrefs.edit().putBoolean(KEY_CLOSE_APP_ON_TIMEOUT, enabled).apply()
+    }
 
     /** Minutes without a connection before searching stops (0 = never stop). */
     fun getReconnectTimeoutMin(): Int =
@@ -368,6 +383,16 @@ class Di2BleService : Service() {
         _channelStates.value = emptyMap()
         _connectionState.value = ConnectionState.DISCONNECTED
         stopForeground(STOP_FOREGROUND_REMOVE)
+
+        if (getCloseAppOnTimeout() && !uiVisible) closeAppCompletely()
+    }
+
+    /** Stops the service, closes the UI task and ends the process so nothing keeps running. */
+    private fun closeAppCompletely() {
+        Log.i(TAG, "Search stopped by timeout, closing the app")
+        sendBroadcast(Intent(ACTION_CLOSE_APP).setPackage(packageName))
+        shutdown()
+        handler.postDelayed({ Process.killProcess(Process.myPid()) }, 800)
     }
 
     @Suppress("DEPRECATION")

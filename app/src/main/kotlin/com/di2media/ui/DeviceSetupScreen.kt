@@ -31,6 +31,8 @@ fun DeviceSetupScreen(
     onForgetClick: () -> Unit = {},
     reconnectTimeoutMin: Int = 10,
     onReconnectTimeoutChanged: (Int) -> Unit = {},
+    closeAppOnTimeout: Boolean = false,
+    onCloseAppOnTimeoutChanged: (Boolean) -> Unit = {},
 ) {
     Column(
         modifier = Modifier
@@ -99,7 +101,10 @@ fun DeviceSetupScreen(
         if (savedAddress != null &&
             (connectionState == ConnectionState.DISCONNECTED || connectionState == ConnectionState.CONNECTING)
         ) {
-            ReconnectTimeoutSetting(reconnectTimeoutMin, onReconnectTimeoutChanged)
+            ReconnectTimeoutSetting(
+                reconnectTimeoutMin, onReconnectTimeoutChanged,
+                closeAppOnTimeout, onCloseAppOnTimeoutChanged
+            )
         }
 
         if (connectionState == ConnectionState.SCANNING && devices.isNotEmpty()) {
@@ -163,7 +168,12 @@ private fun DeviceCard(device: DiscoveredDevice, onClick: () -> Unit) {
 private val TIMEOUT_OPTIONS = listOf(0, 1, 2, 5, 10, 15, 30, 60)
 
 @Composable
-private fun ReconnectTimeoutSetting(minutes: Int, onChanged: (Int) -> Unit) {
+private fun ReconnectTimeoutSetting(
+    minutes: Int,
+    onChanged: (Int) -> Unit,
+    closeApp: Boolean,
+    onCloseAppChanged: (Boolean) -> Unit,
+) {
     var index by remember {
         mutableStateOf(TIMEOUT_OPTIONS.indexOf(minutes).let { if (it < 0) 4 else it }.toFloat())
     }
@@ -185,5 +195,28 @@ private fun ReconnectTimeoutSetting(minutes: Int, onChanged: (Int) -> Unit) {
             valueRange = 0f..(TIMEOUT_OPTIONS.size - 1).toFloat(),
             steps = TIMEOUT_OPTIONS.size - 2
         )
+
+        var closeChecked by remember { mutableStateOf(closeApp) }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Close the app when searching stops", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Fully exits the app after the time above. If the app is on screen at that moment, it stays open.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = closeChecked,
+                enabled = current != 0,
+                onCheckedChange = {
+                    closeChecked = it
+                    onCloseAppChanged(it)
+                }
+            )
+        }
     }
 }

@@ -1,9 +1,11 @@
 package com.di2media
 
 import android.Manifest
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.os.Build
@@ -18,6 +20,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
 import com.di2media.service.ConnectionState
 import com.di2media.service.Di2BleService
 import com.di2media.mapping.ButtonBinding
@@ -34,6 +37,13 @@ class MainActivity : ComponentActivity() {
     private val mappingVersion = mutableStateOf(0)
     private var freshLaunch = false
 
+    // The service asks the UI to close when it stops searching and "close app" is enabled.
+    private val closeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            finishAndRemoveTask()
+        }
+    }
+
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
@@ -48,6 +58,7 @@ class MainActivity : ComponentActivity() {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             val service = (binder as Di2BleService.LocalBinder).getService()
             bleService.value = service
+            service.uiVisible = lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
             if (freshLaunch) {
                 freshLaunch = false
                 service.autoConnectIfSaved()
@@ -61,6 +72,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        bleService.value?.uiVisible = true
         // The app became visible again: if the search was stopped by the timeout, search again.
         bleService.value?.let { if (it.searchGaveUp) it.autoConnectIfSaved() }
     }
@@ -68,6 +80,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         freshLaunch = savedInstanceState == null
+        ContextCompat.registerReceiver(
+            this, closeReceiver, IntentFilter(Di2BleService.ACTION_CLOSE_APP),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
         requestPermissionsAndStart()
 
         setContent {
@@ -125,6 +141,8 @@ class MainActivity : ComponentActivity() {
                         onReconnectClick = { service.savedAddress?.let { service.connectToDevice(it) } },
                         reconnectTimeoutMin = service.getReconnectTimeoutMin(),
                         onReconnectTimeoutChanged = { service.setReconnectTimeoutMin(it) },
+                        closeAppOnTimeout = service.getCloseAppOnTimeout(),
+                        onCloseAppOnTimeoutChanged = { service.setCloseAppOnTimeout(it) },
                         onForgetClick = {
                             service.forgetDevice()
                             mappingVersion.value++
@@ -135,7 +153,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStop() {
+        bleService.value?.uiVisible = false
+        super.onStop()
+    }
+
     override fun onDestroy() {
+        try {
+            unregisterReceiver(closeReceiver)
+        } catch (_: Exception) {
+        }
         if (bleService.value != null) unbindService(serviceConnection)
         super.onDestroy()
     }
